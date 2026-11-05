@@ -1,91 +1,109 @@
-# MovieLens + OMDb Data Pipeline
+# MovieLens Movie Data Pipeline
 
-A compact Python ETL project that imports MovieLens small movie and rating CSVs, enriches movies through OMDb, and loads query-ready tables into SQLite.
+## Overview
+
+This project builds a small, repeatable ETL pipeline for the MovieLens small dataset. It reads movie and rating CSV files, adds available movie details from OMDb, transforms the records, and stores the result in a relational SQLite database. The database can then be queried with the four analysis statements in `queries.sql`.
+
+The repository includes the MovieLens CSV inputs and a 1,000-movie sample database for quick review. The full MovieLens dataset contains 9,742 movies; OMDb's free daily request limit means the full dataset's enrichment may require multiple runs across multiple days.
+
+## Project files
+
+```text
+movie-data-pipeline-assignment/
+├── etl.py
+├── schema.sql
+├── queries.sql
+├── README.md
+├── requirements.txt
+├── prepare_sample.py
+├── data/                       # MovieLens small CSV inputs
+├── data_omdb_sample/           # Quota-sized sample CSV inputs
+└── movie_data_omdb_sample.db   # Sample database for the assignment queries
+```
+
+`movie_data.db` is generated locally by the ETL command and is not committed. The sample database is included so the queries can be reviewed without first making OMDb requests.
 
 ## Requirements
 
-- Python 3.10+
-- MovieLens **small** dataset from [GroupLens](https://grouplens.org/datasets/movielens/latest/)
-- An OMDb API key (free keys can be requested at [omdbapi.com](https://www.omdbapi.com/apikey.aspx))
+- Python 3.10 or later
+- MovieLens small dataset (`movies.csv` and `ratings.csv`), available from [GroupLens](https://grouplens.org/datasets/movielens/latest/). The repository already includes these files in `data/`.
+- An OMDb API key for enrichment. Request a key at [omdbapi.com](https://www.omdbapi.com/apikey.aspx).
 
-SQLite is included with Python. Only `requests` is an external package.
+SQLite is included with Python. The only third-party Python package is `requests`.
 
-## Run it
+## Setup and run
 
-1. Download and extract the MovieLens small archive. Put `movies.csv` and `ratings.csv` in a `data/` directory beside `etl.py`.
-2. Create and activate a virtual environment, then install dependencies:
+From the project root, create a virtual environment and install the dependency:
 
-   ```bash
-   python -m venv .venv
-   # Windows: .venv\Scripts\activate
-   # macOS/Linux: source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+py -m pip install -r requirements.txt
+```
 
-3. Set the API key as an environment variable (keeps the key out of source control):
+On macOS or Linux, use `python3` in place of `py`, and activate with `source .venv/bin/activate`.
 
-   ```bash
-   # Windows PowerShell
-   $env:OMDB_API_KEY = "your_key"
-   # macOS/Linux
-   export OMDB_API_KEY="your_key"
-   ```
-
-4. Run the pipeline:
-
-   ```bash
-   python etl.py --data-dir data --database movie_data.db
-   ```
-
-   The schema is applied automatically. You can override request pacing with `--delay 0.3` or provide paths using `--database` and `--schema`. The output database is local and should not be committed if it contains data or secrets. The supplied MovieLens CSVs are included in `data/`. To load them without an OMDb key, run `python etl.py --data-dir data --database movie_data.db --skip-omdb`; OMDb-derived columns remain null. When a key is available, omit `--skip-omdb` to perform enrichment.
-
-5. Run the four analytical statements in `queries.sql` against `movie_data.db` using `sqlite3`, DB Browser for SQLite, or Python's `sqlite3` module.
-
-### Run from Visual Studio Code on Windows
-
-Open this project folder in VS Code, then press `Ctrl+Shift+P`, choose **Tasks: Run Task**, and select **Run MovieLens sample ETL**. The task uses the bundled quota-sized sample and `--skip-omdb`, so it does not consume API requests. The integrated terminal displays the result. To install or update the Python dependency first, run **Install Python requirements** from the same task menu.
-
-To run the complete local MovieLens CSV load from the VS Code terminal, use:
+To load the MovieLens files without calling OMDb:
 
 ```powershell
 py etl.py --data-dir data --database movie_data.db --skip-omdb
 ```
 
-To perform OMDb enrichment, omit `--skip-omdb` and set `OMDB_API_KEY` in the terminal environment. The API's free daily limit means enrichment can take multiple runs; cached lookups resume on later runs.
+To also enrich movies from OMDb, set the API key in the current PowerShell session, then run the pipeline:
 
-## Quota-sized assignment sample
-
-The free OMDb key permits 1,000 daily requests, while MovieLens small contains 9,742 movies. The full local MovieLens data is retained in `movie_data.db`; repeated ETL runs cache successful and not-found API results so enrichment can continue on later days. To build a one-day, quota-sized analysis sample from the first 1,000 movies already looked up, run:
-
-```bash
-python prepare_sample.py --movie-limit 1000
+```powershell
+$env:OMDB_API_KEY = "your_omdb_key"
+py etl.py --data-dir data --database movie_data.db
 ```
 
-This creates `data_omdb_sample/` with those movies and their ratings, plus `movie_data_omdb_sample.db` with the corresponding cached OMDb results. Run the queries against that sample database for a bounded assignment demo. Ratings and genre questions are complete for the sample; the director query counts available OMDb director credits and excludes titles that OMDb did not find. Its result should therefore be presented as sample-scoped and as based on available director metadata.
+On macOS or Linux, set the key with `export OMDB_API_KEY="your_omdb_key"` and run `python3 etl.py --data-dir data --database movie_data.db`. Keep the key in your environment; do not put it in a source file or commit it to Git.
 
-## Design choices and assumptions
+The script applies `schema.sql` automatically and creates the database file if needed. It uses a short delay between uncached API lookups. OMDb results are cached in the database, so a later run can continue with movies that have not been looked up yet. OMDb not-found results do not prevent MovieLens records from loading. If the service reports a quota or key error, the script pauses additional lookups for that run and completes the local data load.
 
-- SQLite keeps setup friction low while providing relational integrity. `schema.sql` is also a standalone schema deployment script.
-- MovieLens `movieId` remains the movie key. Genres are stored in `genres` and `movie_genres`; ratings refer to a movie and use `(user_id, movie_id, rated_at)` as their natural key. This retains records even if the same user rates a movie again at a different time.
-- The year in the MovieLens title is preferred as a lookup hint; OMDb's release year is used when returned. `decade` is derived from the selected year. The original title is kept as supplied by MovieLens.
-- OMDb enrichment fields are nullable. A not-found title or exhausted transient retries does not stop ingestion. The local CSV-only mode can be used before an API key is configured. Successful raw OMDb responses are retained as JSON for traceability.
-- API requests use a timeout, three attempts with exponential backoff for transport/HTTP/JSON errors, and a configurable delay between uncached lookups. The key is read from `OMDB_API_KEY`.
-- OMDb successes and definitive not-found results are stored in `omdb_cache`. If OMDb reports a quota, key, or service error, lookup requests pause for the rest of that run while local ingestion finishes. Run the same command again later to resume at the next uncached movie; completed lookups are not repeated.
-- The load is idempotent: movie rows are upserted, genre links are replaced for each imported movie, and ratings are upserted by their natural key. OMDb responses are cached so reruns can resume enrichment without duplicating API calls.
-- Box Office is parsed to an integer USD amount when OMDb supplies a parseable value. Currency conversion is not attempted.
+### Run the included sample
 
-## Challenges and handling
+The sample is already built. To recreate its CSV inputs and database from the full database's cached OMDb results, run:
 
-Movie titles can be ambiguous or absent from OMDb. The pipeline supplies a parsed year to narrow title search, treats explicit API misses as nullable enrichment, and reports exhausted request failures. Invalid CSV rating rows are skipped with a diagnostic; database constraints protect referential integrity and valid rating ranges. The free OMDb key allows 1,000 daily requests, so full enrichment of this dataset takes multiple days. The persistent cache and quota pause make that process resumable.
+```powershell
+py prepare_sample.py --movie-limit 1000
+```
 
-## Production extensions
+To rebuild the sample database from its CSV files without making API calls:
 
-For larger or scheduled loads, add structured logs and metrics, a staging table with validation reports, and incremental change detection. A server database and orchestrator would support concurrent analytics and retries at task level. IMDb IDs could be reconciled from a dedicated crosswalk instead of title matching.
+```powershell
+py etl.py --data-dir data_omdb_sample --database movie_data_omdb_sample.db --skip-omdb
+```
 
-## Repository contents
+### Run the analysis queries
 
-- `etl.py`: extraction, transformation, and idempotent SQLite loading
-- `prepare_sample.py`: create a quota-sized CSV and database sample from the cached full load
-- `schema.sql`: relational schema and indexes
-- `queries.sql`: requested analytical queries
-- `requirements.txt`: Python dependency
+Open `movie_data_omdb_sample.db` in DB Browser for SQLite, choose **Execute SQL**, open or paste the statements from `queries.sql`, and run them. The queries also work with `movie_data.db` after the full CSV load. Query 3 counts only directors returned by OMDb, so its result reflects the available director metadata in the selected database.
+
+## Data model and design choices
+
+- `movies` stores one row per MovieLens movie ID and its available OMDb details.
+- `genres` stores unique genre names. `movie_genres` links movies to genres in a many-to-many relationship.
+- `ratings` stores each user's rating and UTC timestamp. Its composite key is `(user_id, movie_id, rated_at)`.
+- `omdb_cache` stores successful lookups and definitive not-found results to avoid repeating API requests on later runs.
+- SQLite was chosen because it is lightweight, relational, and requires no separate database server for this assignment.
+- The MovieLens movie ID is the stable key. OMDb lookups use the title and, when available, the year parsed from the MovieLens title. Titles are not guaranteed to match OMDb exactly, so enrichment fields can be missing.
+- Missing OMDb values are stored as `NULL`. MovieLens genres remain normalized into separate genre and link tables. A decade column is derived from the selected release year.
+- Box Office values are stored as integer USD amounts when OMDb provides a parseable value. No currency conversion is performed.
+
+## Idempotency and data quality
+
+Running the ETL more than once does not duplicate movie, genre-link, or rating records. Movies are upserted by MovieLens ID, genre links are rebuilt from the current CSV row, and ratings are upserted by their composite key. The schema enforces foreign keys and rating bounds. Invalid rating rows are skipped with a diagnostic, while missing movie metadata does not block the load.
+
+## Challenges and how they were handled
+
+Movie titles may be ambiguous or absent from OMDb. The lookup includes a parsed release year when possible; definitive “Movie not found” responses are cached, and missing enrichment remains nullable. The free OMDb plan limits daily requests, so the persistent cache supports resuming lookups on later days. Quota and service errors stop further lookups for that run instead of issuing a failing request for every remaining title. SQLite's foreign-key constraints and input validation help catch or skip malformed data while preserving the rest of the load.
+
+## Assignment SQL
+
+`queries.sql` contains four example analyses:
+
+1. Movie with the highest average rating.
+2. Five genres with the highest average rating.
+3. Director credited with the most movies in the available OMDb data.
+4. Average rating by release year.
+
+
