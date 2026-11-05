@@ -2,46 +2,43 @@
 
 ## Overview
 
-This project loads MovieLens movie and rating CSV files, adds available movie details from OMDb, and saves the results in SQLite. The SQL queries in `queries.sql` analyze the loaded data.
+I built a Python ETL pipeline that combines MovieLens movie and rating data with extra movie details from OMDb, stores the result in SQLite, and answers analysis questions with SQL.
 
-## Files
+## Pipeline
 
-- `etl.py` — reads, cleans, enriches, and loads the data.
-- `schema.sql` — creates the database tables.
-- `queries.sql` — contains the assignment queries.
-- `data/` — MovieLens CSV input files.
-- `data_omdb_sample/` and `movie_data_omdb_sample.db` — 1,000-movie sample for a quick demo.
+1. **Extract:** Read `movies.csv` and `ratings.csv` from `data/` and request movie details from OMDb.
+2. **Transform:** Clean the input, split movie genres into related records, and derive each movie's decade.
+3. **Load:** Save movies, genres, ratings, and available OMDb details to SQLite. The script can be rerun without duplicating records.
+4. **Analyze:** Run the four queries in `queries.sql` against the database.
 
-## Setup and run
+## Run the project
 
-Python 3.10+ is required. From the project folder in PowerShell, run:
+Requirements: Python 3.10+ and an OMDb API key for enrichment. Install the dependency from the project folder:
 
 ```powershell
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
 py -m pip install -r requirements.txt
 ```
 
-Load all MovieLens CSV data without OMDb enrichment:
+Load MovieLens data without OMDb enrichment:
 
 ```powershell
 py etl.py --data-dir data --database movie_data.db --skip-omdb
 ```
 
-To also fetch OMDb details, set your API key and run the ETL:
+Load MovieLens data and request OMDb details:
 
 ```powershell
 $env:OMDB_API_KEY = "your_omdb_key"
 py etl.py --data-dir data --database movie_data.db
 ```
 
-The script creates the tables automatically. The API key should be kept private and out of the project files. The sample database is already included; open it with DB Browser for SQLite and run `queries.sql` in **Execute SQL**. A SQLite database is a binary file, so use DB Browser rather than opening it as text in VS Code.
+The repository includes a 1,000-movie sample database. Open `movie_data_omdb_sample.db` in DB Browser for SQLite and run `queries.sql` from **Execute SQL**.
 
-## Design and assumptions
+## Design choices
 
-SQLite keeps the project simple to run. Movies, genres, and ratings are stored in related tables; a movie can have multiple genres. MovieLens IDs identify movies, and ratings use user, movie, and timestamp as their key. OMDb fields can be empty when a title is not found. The pipeline caches completed OMDb lookups and can be rerun without adding duplicate records. Release decade is derived from the movie year.
+I used SQLite to keep the project easy to run. Movies, genres, and ratings are stored in related tables, with a separate link table for movie genres. MovieLens IDs identify movies; ratings use the user, movie, and timestamp together. Missing OMDb details are left empty. The database caches completed lookups and uses keys to prevent duplicate records.
 
 ## Challenges
 
-The free OMDb key allows **1,000 requests per day**, while MovieLens small contains **9,742 movies**. I included a 1,000-movie sample for the demo; the cache lets OMDb enrichment continue on later days. Movie titles may not match OMDb exactly, so the script uses the year when available and continues loading when details are missing.
+The free OMDb key allows 1,000 requests per day, while MovieLens small contains 9,742 movies. I included a 1,000-movie sample and added a cache so enrichment can continue on later days. Some titles are not found by OMDb, and a rejected API key returns HTTP 401; in either case, OMDb details may be missing, but the MovieLens movies and ratings still load.
 
