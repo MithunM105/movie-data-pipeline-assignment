@@ -1,0 +1,26 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Install Python requirements",
+      "type": "process",
+      "command": "py",
+      "args": ["-m", "pip", "install", "-r", "requirements.txt"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run MovieLens sample ETL",
+      "type": "process",
+      "command": "py",
+      "args": [
+        "etl.py",
+        "--data-dir", "data_omdb_sample",
+        "--database", "movie_data_omdb_sample.db",
+        "--skip-omdb"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    }
+  ]
+}

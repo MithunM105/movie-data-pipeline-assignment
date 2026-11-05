@@ -6,4 +6,3 @@ venv/
 !.env.example
 *.py[cod]
 *.db
-
