@@ -6,3 +6,5 @@ venv/
 !.env.example
 *.py[cod]
 *.db
+!movie_data_omdb_sample.db
+
