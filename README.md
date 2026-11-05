@@ -40,5 +40,6 @@ I used SQLite to keep the project easy to run. Movies, genres, and ratings are s
 
 ## Challenges
 
-The free OMDb key allows 1,000 requests per day, while MovieLens small contains 9,742 movies. I included a 1,000-movie sample and added a cache so enrichment can continue on later days. Some titles are not found by OMDb, and a rejected API key returns HTTP 401; in either case, OMDb details may be missing, but the MovieLens movies and ratings still load.
+OMDb allows 1,000 free requests per day, but MovieLens small has 9,742 movies. I included a 1,000-movie sample and cached lookups so enrichment can resume later. Unmatched titles keep missing OMDb details; the MovieLens data still loads.
+
 
