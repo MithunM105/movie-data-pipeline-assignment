@@ -93,9 +93,16 @@ Open `movie_data_omdb_sample.db` in DB Browser for SQLite, choose **Execute SQL*
 
 Running the ETL more than once does not duplicate movie, genre-link, or rating records. Movies are upserted by MovieLens ID, genre links are rebuilt from the current CSV row, and ratings are upserted by their composite key. The schema enforces foreign keys and rating bounds. Invalid rating rows are skipped with a diagnostic, while missing movie metadata does not block the load.
 
-## Challenges and how they were handled
+## Challenges I faced and how I handled them
 
-Movie titles may be ambiguous or absent from OMDb. The lookup includes a parsed release year when possible; definitive “Movie not found” responses are cached, and missing enrichment remains nullable. The free OMDb plan limits daily requests, so the persistent cache supports resuming lookups on later days. Quota and service errors stop further lookups for that run instead of issuing a failing request for every remaining title. SQLite's foreign-key constraints and input validation help catch or skip malformed data while preserving the rest of the load.
+- **OMDb's daily request limit:** The free OMDb key allows 1,000 requests per day. MovieLens small has 9,742 movies, so I could not fetch OMDb details for every movie in one day. I included a 1,000-movie sample for a ready-to-run demonstration. The ETL cache saves completed lookups, so I can run the full dataset again on later days and continue enriching movies that were not looked up yet. The MovieLens CSV data can still be loaded even when OMDb lookups pause.
+- **Movie titles do not always match:** Some MovieLens titles may not be found in OMDb or may have different title text. I include the year in the lookup when it is available, keep missing OMDb fields empty, and continue loading the rest of the movies instead of stopping the whole pipeline.
+- **Keeping the data connected:** Movies, genres, and ratings are related, so I used separate tables and keys to prevent duplicate records and keep those links consistent. I also made the load safe to rerun, which helped me check the results without creating duplicate movies or ratings.
+- **Opening the database:** A SQLite database is a binary file, so it does not display as readable text in VS Code. I use VS Code for the Python and SQL files, and DB Browser for SQLite to open the database and run the queries.
+
+## Simple project explanation
+
+“I used Python to read the MovieLens movie and rating files, add extra movie information from OMDb when it is available, and save the results in SQLite. I separated movies, genres, and ratings into related tables, then wrote SQL queries to analyze the data. One challenge was that the free OMDb key allows only 1,000 requests per day, while the dataset has 9,742 movies. I prepared a 1,000-movie sample for the demo and added a cache so the remaining OMDb lookups can continue on later days.”
 
 ## Assignment SQL
 
@@ -105,5 +112,6 @@ Movie titles may be ambiguous or absent from OMDb. The lookup includes a parsed 
 2. Five genres with the highest average rating.
 3. Director credited with the most movies in the available OMDb data.
 4. Average rating by release year.
+
 
 
