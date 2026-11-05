@@ -14,17 +14,10 @@ I built a Python ETL pipeline that combines MovieLens movie and rating data with
 
 ## Architecture
 
-```text
-MovieLens CSVs ----+
-                   +--> etl.py --> Extract --> Transform/enrich --> Load --+
-OMDb API ----------+                                                     |
-schema.sql ------------> defines the SQLite tables -----------------------+
-                                                                          v
-                                                               SQLite database
-                                                                          |
-                                                                          v
-                                                        queries.sql --> Results
-```
+MovieLens and OMDb provide the inputs. `etl.py` extracts, transforms and enriches the data, then loads it into SQLite. `schema.sql` defines the tables, and `queries.sql` analyzes the loaded data.
+
+![MovieLens ETL architecture](architecture.svg)
+
 ## Run the project
 
 Requirements: Python 3.10+ and an OMDb API key for enrichment. Install the dependency from the project folder:
@@ -55,6 +48,9 @@ I used SQLite to keep the project easy to run. Movies, genres, and ratings are s
 ## Challenges
 
 OMDb allows 1,000 free requests per day, but MovieLens small has 9,742 movies. I included a 1,000-movie sample and cached lookups so enrichment can resume later. Unmatched titles keep missing OMDb details; the MovieLens data still loads.
+
+
+
 
 
 
